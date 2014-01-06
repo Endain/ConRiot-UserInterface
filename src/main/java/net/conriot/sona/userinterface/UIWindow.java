@@ -7,21 +7,22 @@ import lombok.Getter;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.plugin.Plugin;
 
 public class UIWindow implements Listener {
-	private Plugin plugin;
+	private UserInterface plugin;
+	private UIWindow self;
 	@Getter private Player owner;
 	@Getter private int rows;
 	private String title;
@@ -32,7 +33,8 @@ public class UIWindow implements Listener {
 	private boolean renamed;
 	
 	
-	public UIWindow(Plugin plugin, Player owner, int rows, String title, UICallback callback) {
+	public UIWindow(UserInterface plugin, Player owner, int rows, String title, UICallback callback) {
+		this.self = this;
 		this.plugin = plugin;
 		this.owner = owner;
 		this.rows = rows;
@@ -40,7 +42,7 @@ public class UIWindow implements Listener {
 		this.callback = callback;
 		this.open = false;
 		this.movable = new boolean[rows * 9];
-		this.inv = Bukkit.createInventory(this.owner, 9 * this.rows, this.title);
+		this.inv = Bukkit.createInventory(this.owner, 9 * this.rows, cleanTitle(this.title));
 		this.renamed = false;
 		
 		// Lock all slots by default
@@ -73,26 +75,6 @@ public class UIWindow implements Listener {
 		
 		// Close the currently open inv
 		this.owner.closeInventory();
-		
-		// Flag the inventory as closed
-		this.open = false;
-	}
-	
-	public void forceClose() {
-		// Only close if it was open in the first place
-		if(this.open) {
-			// Close the inventory window if it's being viewed
-			Iterator<HumanEntity> iter = this.inv.getViewers().iterator();
-			while(iter.hasNext())
-				if(iter.next() == this.owner)
-					this.owner.closeInventory();
-			
-			// Flag the inventory as closed
-			this.open = false;
-			
-			// Send a callback noting the forced closure
-			this.callback.closed(this, this.owner);
-		}
 	}
 	
 	public void rename(String title) {
@@ -110,7 +92,7 @@ public class UIWindow implements Listener {
 			}
 			
 			// Create a new inventory object
-			this.inv = Bukkit.createInventory(this.owner, 9 * this.rows, this.title);
+			this.inv = Bukkit.createInventory(this.owner, 9 * this.rows, cleanTitle(this.title));
 			
 			// Copy the items back into inventory
 			for(int i = 0; i < temp.length; i++) {
@@ -193,12 +175,19 @@ public class UIWindow implements Listener {
 			this.inv.setItem(slot, null);
 	}
 	
+	private String cleanTitle(String title) {
+		if(title.length() > 32)
+			return title.substring(0, 32);
+		return title;
+	}
+	
 	@EventHandler
 	public void onQuit(PlayerQuitEvent event) {
 		// Check if this event pertains to this inventory's owner
 		if(event.getPlayer() == this.owner) {
 			// Force the inventory to close if the player leaves
-			forceClose();
+			close();
+			//forceClose();
 		}
 	}
 	
@@ -207,31 +196,75 @@ public class UIWindow implements Listener {
 		// Check if this event pertains to this inventory's owner
 		if(event.getEntity() instanceof Player && (Player)event.getEntity() == this.owner) {
 			// Force the inventory to close if the player dies
-			forceClose();
+			close();
+			//forceClose();
 		}
 	}
 	
 	@EventHandler
 	public void onInvClick(InventoryClickEvent event) {
 		// Check if this event pertains to this inventory interface
-		if(event.getInventory() == this.inv) {
-			// Check if the slot clicked is locked
-			if(!this.movable[event.getRawSlot()]) {
-				// Cancel the event and send a callback
-				event.setCancelled(true);
-				this.callback.clicked(this, this.owner, event.getRawSlot(), event.getCursor());
-			} else {
-				// Handle pickup and place events
-				if(event.getAction() == InventoryAction.PICKUP_ALL) {
-					// Send a callback notifying of the item taken event
-					this.callback.taken(this, this.owner, event.getRawSlot(), event.getCurrentItem());
-				} else if(event.getAction() == InventoryAction.PICKUP_ALL) {
-					// Send a callback notifying of the item placed event
-					this.callback.placed(this, this.owner, event.getRawSlot(), event.getCurrentItem());
-				} else {
-					// Disallow any other type of item movement for simplicities sake
+		if(this.inv.getViewers().size() > 0 && event.getView().getPlayer() == this.owner) {
+			// Check if this click was inside the UI space
+			if(event.getRawSlot() < (this.rows * 9) && event.getRawSlot() >= 0) {
+				// Check if the slot clicked is locked
+				if(!this.movable[event.getRawSlot()]) {
+					// Cancel the event and send a callback
 					event.setCancelled(true);
+					this.callback.clicked(this, this.owner, event.getRawSlot(), event.getCurrentItem());
+				} else {
+					// Handle pickup and place events
+					if(event.getAction() == InventoryAction.PICKUP_ALL) {
+						// Send a callback notifying of the item taken event
+						this.callback.taken(this, this.owner, event.getRawSlot(), event.getCurrentItem());
+					} else if(event.getAction() == InventoryAction.PLACE_ALL && event.getCurrentItem().getAmount() == 0) {
+						event.getResult();
+						// Send a callback notifying of the item placed event
+						this.callback.placed(this, this.owner, event.getRawSlot(), event.getCursor());
+					} else {
+						// Disallow any other type of item movement for simplicities sake
+						event.setCancelled(true);
+					}
 				}
+			} else {
+				// Disallow certain events that could break the UI, such as collection
+				if(event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY || event.getAction() == InventoryAction.COLLECT_TO_CURSOR ||event.getAction() == InventoryAction.UNKNOWN)
+					event.setCancelled(true);
+			}
+		}
+	}
+	
+	@EventHandler
+	public void onInvDrag(InventoryDragEvent event) {
+		// Check if this event pertains to this inventory interface
+		if(this.inv.getViewers().size() > 0 && event.getView().getPlayer() == this.owner) {
+			// If any slots involved were a part of the ui inventory, cancel the event
+			Iterator<Integer> iter = event.getRawSlots().iterator();
+			while(iter.hasNext()) {
+				if(iter.next() < this.rows * 9) {
+					event.setCancelled(true);
+					break;
+				}
+			}
+		}
+	}
+	
+	@EventHandler
+	public void onInvClose(InventoryCloseEvent event) {
+		// Check if this event pertains to this inventory interface
+		if(this.inv.getViewers().size() > 0 && event.getView().getPlayer() == this.owner) {
+			// Check if the inventory was supposedly open
+			if(this.open) {
+				// Flag the inventory as closed
+				this.open = false;
+				
+				// Notify that the inventory was closed on the text tick
+				Bukkit.getScheduler().runTaskLater(this.plugin, new Runnable() {
+					@Override
+					public void run() {
+						callback.closed(self, owner);
+					}
+				}, 0);
 			}
 		}
 	}

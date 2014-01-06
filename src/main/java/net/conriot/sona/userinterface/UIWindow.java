@@ -171,8 +171,13 @@ public class UIWindow implements Listener {
 	
 	public void clear(int slot) {
 		// Clear the item is the given slot is in range
-		if(slot < this.rows * 9 && slot >= 0)
-			this.inv.setItem(slot, null);
+		if(slot < this.rows * 9 && slot >= 0) {
+			// Create an emtpy itemstack
+			ItemStack clear = new ItemStack(Material.AIR, 0);
+			
+			// Insert it into the slot to be cleared
+			this.inv.setItem(slot, clear);
+		}
 	}
 	
 	private String cleanTitle(String title) {

@@ -123,6 +123,9 @@ public class UIWindow implements Listener {
 	}
 	
 	public void setRaw(int slot, ItemStack item) {
+		// Purify item stack input
+		item = purify(item);
+		
 		// Set the item is the given slot is in range
 		if(slot < this.rows * 9 && slot >= 0)
 			this.inv.setItem(slot, item);
@@ -131,10 +134,14 @@ public class UIWindow implements Listener {
 	public void setAllRaw(ItemStack[] items) {
 		// Set the item is the given slot is in range
 		if(items.length == this.rows * 9)
-			this.inv.setContents(items);
+			for(int i = 0; i < items.length; i++)
+				setRaw(i, items[i]);
 	}
 	
 	public void set(int slot, ItemStack item, String name, String[] lore) {
+		// Purify item stack input
+		item = purify(item);
+		
 		// Set the item is the given slot is in range
 		if(slot < this.rows * 9 && slot >= 0) {
 			// Set any applicable metadata
@@ -184,6 +191,12 @@ public class UIWindow implements Listener {
 		if(title.length() > 32)
 			return title.substring(0, 32);
 		return title;
+	}
+	
+	private ItemStack purify(ItemStack item) {
+		if(item == null)
+			return new ItemStack(Material.AIR, 0);
+		return item;
 	}
 	
 	@EventHandler

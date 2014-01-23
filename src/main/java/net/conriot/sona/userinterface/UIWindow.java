@@ -146,11 +146,13 @@ public class UIWindow implements Listener {
 		if(slot < this.rows * 9 && slot >= 0) {
 			// Set any applicable metadata
 			ItemMeta im = item.getItemMeta();
-			if(name != null)
-				im.setDisplayName(name);
-			if(lore != null)
-				im.setLore(Arrays.asList(lore));
-		    item.setItemMeta(im);
+			if(im != null) {
+				if(name != null)
+					im.setDisplayName(name);
+				if(lore != null)
+					im.setLore(Arrays.asList(lore));
+			    item.setItemMeta(im);
+			}
 		    
 		    // Insert the item stack
 		    this.inv.setItem(slot, item);
@@ -165,11 +167,13 @@ public class UIWindow implements Listener {
 			
 			// Set any applicable metadata
 			ItemMeta im = item.getItemMeta();
-			if(name != null)
-				im.setDisplayName(name);
-			if(lore != null)
-				im.setLore(Arrays.asList(lore));
-		    item.setItemMeta(im);
+			if(im != null) {
+				if(name != null)
+					im.setDisplayName(name);
+				if(lore != null)
+					im.setLore(Arrays.asList(lore));
+			    item.setItemMeta(im);
+			}
 		    
 		    // Insert the item stack
 		    this.inv.setItem(slot, item);
